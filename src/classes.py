@@ -29,5 +29,5 @@ class RNA2RNA:
     def __init__(self, lncRNA1, lncRNA2, y: int, key=None):
         self.lncRNA1 = lncRNA1
         self.lncRNA2 = lncRNA2
-        self.y = y  # y=1代表真的连接，y=0代表假的连接
+        self.y = y  # y=1代表lncRNA，y=0代表蛋白质
         self.key = key
