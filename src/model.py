@@ -1,12 +1,12 @@
 import torch
 import torch.nn.functional as F
-from torch_geometric.nn import HeteroConv, GCNConv, SAGEConv
+from torch_geometric.nn import HeteroConv, GCNConv, SAGEConv, Linear
 from torch.utils.data import DataLoader, Dataset
 import os
 from torch.cuda.amp import GradScaler, autocast
 from sklearn.metrics import matthews_corrcoef
 
-# 检查 GPU 可用性并设置设备
+# 检查GPU可用性并设置设备
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -25,54 +25,87 @@ class SampleDataset(Dataset):
 class HeteroGNN(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super().__init__()
-        # 定义 jaccard 图的第一层卷积
-        self.conv1_jaccard = HeteroConv({
-            ('lncRNA', 'interacts_with', 'protein'): SAGEConv((in_channels['lncRNA'], in_channels['protein']),
-                                                              hidden_channels),
-            ('lncRNA', 'jaccard_related', 'lncRNA'): GCNConv(in_channels['lncRNA'], hidden_channels),
-            ('protein', 'jaccard_related', 'protein'): GCNConv(in_channels['protein'], hidden_channels)
-        }, aggr='sum')
-        # 定义 jaccard 图的第二层卷积
-        self.conv2_jaccard = HeteroConv({
-            ('lncRNA', 'interacts_with', 'protein'): SAGEConv((hidden_channels, hidden_channels), out_channels),
-            ('lncRNA', 'jaccard_related', 'lncRNA'): GCNConv(hidden_channels, out_channels),
-            ('protein', 'jaccard_related', 'protein'): GCNConv(hidden_channels, out_channels)
-        }, aggr='sum')
 
-        # 定义 blast 图的第一层卷积
-        self.conv1_blast = HeteroConv({
-            ('lncRNA', 'interacts_with', 'protein'): SAGEConv((in_channels['lncRNA'], in_channels['protein']),
-                                                              hidden_channels),
-            ('lncRNA', 'blast_related', 'lncRNA'): GCNConv(in_channels['lncRNA'], hidden_channels),
-            ('protein', 'blast_related', 'protein'): GCNConv(in_channels['protein'], hidden_channels)
-        }, aggr='sum')
-        # 定义 blast 图的第二层卷积
-        self.conv2_blast = HeteroConv({
-            ('lncRNA', 'interacts_with', 'protein'): SAGEConv((hidden_channels, hidden_channels), out_channels),
-            ('lncRNA', 'blast_related', 'lncRNA'): GCNConv(hidden_channels, out_channels),
-            ('protein', 'blast_related', 'protein'): GCNConv(hidden_channels, out_channels)
-        }, aggr='sum')
+        # 确保out_channels是hidden_channels的一半，以便维度匹配
+        assert out_channels == hidden_channels // 2, "out_channels should be half of hidden_channels for dimension matching"
 
-        # 定义用于拼接特征后的线性层进行预测
-        self.lin = torch.nn.Linear(2 * out_channels * 2, 1)
+        # 1. 改进的图卷积层
+        self.jaccard_convs = torch.nn.ModuleList([
+            HeteroConv({
+                ('lncRNA', 'interacts_with', 'protein'): SAGEConv((in_channels['lncRNA'], in_channels['protein']),
+                                                                  hidden_channels),
+                ('lncRNA', 'jaccard_related', 'lncRNA'): GCNConv(in_channels['lncRNA'], hidden_channels),
+                ('protein', 'jaccard_related', 'protein'): GCNConv(in_channels['protein'], hidden_channels)
+            }, aggr='mean'),
+            HeteroConv({
+                ('lncRNA', 'interacts_with', 'protein'): SAGEConv((hidden_channels, hidden_channels), out_channels),
+                ('lncRNA', 'jaccard_related', 'lncRNA'): GCNConv(hidden_channels, out_channels),
+                ('protein', 'jaccard_related', 'protein'): GCNConv(hidden_channels, out_channels)
+            }, aggr='mean')
+        ])
+
+        self.blast_convs = torch.nn.ModuleList([
+            HeteroConv({
+                ('lncRNA', 'interacts_with', 'protein'): SAGEConv((in_channels['lncRNA'], in_channels['protein']),
+                                                                  hidden_channels),
+                ('lncRNA', 'blast_related', 'lncRNA'): GCNConv(in_channels['lncRNA'], hidden_channels),
+                ('protein', 'blast_related', 'protein'): GCNConv(in_channels['protein'], hidden_channels)
+            }, aggr='mean'),
+            HeteroConv({
+                ('lncRNA', 'interacts_with', 'protein'): SAGEConv((hidden_channels, hidden_channels), out_channels),
+                ('lncRNA', 'blast_related', 'lncRNA'): GCNConv(hidden_channels, out_channels),
+                ('protein', 'blast_related', 'protein'): GCNConv(hidden_channels, out_channels)
+            }, aggr='mean')
+        ])
+
+        # 2. 预测层
+        self.bn = torch.nn.BatchNorm1d(2 * out_channels)
+        self.dropout = torch.nn.Dropout(0.3)
+        self.lin1 = Linear(2 * out_channels, out_channels)
+        self.lin2 = Linear(out_channels, 1)
+
+        # 3. 修改残差连接 - 确保维度匹配
+        self.residual_lncRNA = Linear(in_channels['lncRNA'], out_channels)
+        self.residual_protein = Linear(in_channels['protein'], out_channels)
 
     def forward(self, x_dict_jaccard, edge_index_dict_jaccard, x_dict_blast, edge_index_dict_blast):
-        # 处理 jaccard 图
-        x_dict_jaccard = self.conv1_jaccard(x_dict_jaccard, edge_index_dict_jaccard)
-        x_dict_jaccard = {key: F.relu(x) for key, x in x_dict_jaccard.items()}
-        x_dict_jaccard = self.conv2_jaccard(x_dict_jaccard, edge_index_dict_jaccard)
+        # 保存原始特征用于残差连接
+        x_lncRNA_orig = x_dict_jaccard['lncRNA']
+        x_protein_orig = x_dict_jaccard['protein']
 
-        # 处理 blast 图
-        x_dict_blast = self.conv1_blast(x_dict_blast, edge_index_dict_blast)
-        x_dict_blast = {key: F.relu(x) for key, x in x_dict_blast.items()}
-        x_dict_blast = self.conv2_blast(x_dict_blast, edge_index_dict_blast)
+        # 处理jaccard图
+        for conv in self.jaccard_convs:
+            x_dict_jaccard = conv(x_dict_jaccard, edge_index_dict_jaccard)
+            x_dict_jaccard = {key: F.leaky_relu(x, negative_slope=0.2) for key, x in x_dict_jaccard.items()}
+
+        # 处理blast图
+        for conv in self.blast_convs:
+            x_dict_blast = conv(x_dict_blast, edge_index_dict_blast)
+            x_dict_blast = {key: F.leaky_relu(x, negative_slope=0.2) for key, x in x_dict_blast.items()}
 
         # 拼接特征
         combined_embeddings = {}
         for node_type in x_dict_jaccard.keys():
-            combined_embeddings[node_type] = torch.cat([x_dict_jaccard[node_type], x_dict_blast[node_type]], dim=1)
+            # 不再拼接两个图的特征，而是取平均
+            combined = (x_dict_jaccard[node_type] + x_dict_blast[node_type]) / 2
+
+            # 添加残差连接
+            if node_type == 'lncRNA':
+                residual = self.residual_lncRNA(x_lncRNA_orig)
+            else:
+                residual = self.residual_protein(x_protein_orig)
+
+            combined_embeddings[node_type] = combined + residual
 
         return combined_embeddings
+
+    def predict(self, lncRNA_emb, protein_emb):
+        # 预测流程
+        combined = torch.cat([lncRNA_emb, protein_emb], dim=1)
+        combined = self.bn(combined)
+        combined = self.dropout(combined)
+        combined = F.leaky_relu(self.lin1(combined), negative_slope=0.2)
+        return self.lin2(combined)
 
 
 def evaluate_model(model, graph_jaccard, graph_blast, samples, batch_size=512):
@@ -124,8 +157,7 @@ def evaluate_model(model, graph_jaccard, graph_blast, samples, batch_size=512):
 
             lncRNA_emb = combined_embeddings['lncRNA'][lncRNA_indices]
             protein_emb = combined_embeddings['protein'][protein_indices]
-            combined_emb = torch.cat([lncRNA_emb, protein_emb], dim=1)
-            scores = model.lin(combined_emb).squeeze()
+            scores = model.predict(lncRNA_emb, protein_emb).squeeze()
             preds = (torch.sigmoid(scores) > 0.5).float()
 
             correct += (preds == labels).sum().item()
@@ -200,7 +232,7 @@ if __name__ == "__main__":
 
     # 训练模型
     model.train()
-    for epoch in range(100):
+    for epoch in range(200):
         total_loss = 0
         for lncRNA_indices, protein_indices, labels in train_loader:
             lncRNA_indices = lncRNA_indices.to(device)
@@ -217,7 +249,8 @@ if __name__ == "__main__":
                 lncRNA_emb = combined_embeddings['lncRNA'][lncRNA_indices]
                 protein_emb = combined_embeddings['protein'][protein_indices]
                 combined_emb = torch.cat([lncRNA_emb, protein_emb], dim=1)
-                scores = model.lin(combined_emb).squeeze()
+                scores = model.predict(lncRNA_emb, protein_emb).squeeze()
+
                 loss = F.binary_cross_entropy_with_logits(scores, labels)
 
             # 混合精度反向传播

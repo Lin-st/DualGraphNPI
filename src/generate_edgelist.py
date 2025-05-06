@@ -428,6 +428,6 @@ if __name__ == '__main__':
 
     graph_jaccard = create_pyg_graph_jaccard(interaction_list, lncRNA_list, protein_list, jaccard_list)
     graph_blast = create_pyg_graph_blast(interaction_list, lncRNA_list, protein_list, blast_list)
-    generate_training_and_testing(graph_jaccard,graph_blast)
+    # generate_training_and_testing(graph_jaccard,graph_blast)
     print(graph_jaccard)
     print(graph_blast)
