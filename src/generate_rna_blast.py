@@ -48,21 +48,23 @@ def get_all_hits(blast_results_file, query_id):
 
 def extract_sequence(fasta_file, seq_id):
     """
-    从 FASTA 文件中提取指定 ID 的序列
+    从 FASTA 文件中提取指定 ID 的序列，处理序列换行问题
     """
     current_id = None
     current_seq = ""
+    collecting_seq = False
     with open(fasta_file) as f:
         for line in f:
             if line.startswith('>'):
-                if current_id == seq_id:
+                if collecting_seq and current_id == seq_id:
                     return current_seq
                 current_id = line.strip()[1:]
+                collecting_seq = (current_id == seq_id)
                 current_seq = ""
             else:
-                if current_id == seq_id:
+                if collecting_seq:
                     current_seq += line.strip()
-    if current_id == seq_id:
+    if collecting_seq and current_id == seq_id:
         return current_seq
     return None
 
@@ -79,12 +81,12 @@ def create_rna_pair_list(query_id, all_hit_ids, output_file):
 
 
 if __name__ == "__main__":
-    fasta_file = "data/lncRNA_sequence/NPInter2/lncRNA_sequence.fasta"  # 替换为你的 RNA FASTA 文件路径
-    output_file = "rna_pair_list.txt"
-
+    # fasta_file = "data/lncRNA_sequence/NPInter2/lncRNA_sequence.fasta"  # 替换为你的 RNA FASTA 文件路径
+    # output_file = "rna_pair_list.txt"
+    fasta_file = "../data/lncRNA_sequence/RPI369/lncRNA_sequence.fasta"  # 替换为你的 RNA FASTA 文件路径
+    output_file = "../data/blast/RPI369/rna_pair_list.txt"
     # 创建 BLAST 数据库
     create_blast_database(fasta_file)
-
     # 提取所有序列 ID
     seq_ids = []
     current_id = None
@@ -93,23 +95,18 @@ if __name__ == "__main__":
             if line.startswith('>'):
                 current_id = line.strip()[1:]
                 seq_ids.append(current_id)
-
     for query_id in seq_ids:
         # 提取目标 RNA 序列到一个单独的文件
         query_seq = extract_sequence(fasta_file, query_id)
         if query_seq:
             with open("query.fasta", "w") as query_file:
                 query_file.write(f">{query_id}\n{query_seq}\n")
-
             # 执行 BLAST 搜索，并设置相似性阈值
             perform_blast("query.fasta", "rna_db", evalue_threshold=1e-5, perc_identity_threshold=70)
-
             # 获取所有符合条件的匹配序列 ID（排除自身）
             all_hit_ids = get_all_hits("blast_results.txt", query_id)
-
             # 创建 RNA-RNA 列表文件
             create_rna_pair_list(query_id, all_hit_ids, output_file)
-
     # 删除临时文件
     if os.path.exists("query.fasta"):
         os.remove("query.fasta")

@@ -34,7 +34,7 @@ def write_to_excel(pairs, output_file_path):
 
 
 if __name__ == "__main__":
-    input_file = 'protein_pair_list.txt'
-    output_file = 'protein_protein_pairs.xlsx'
+    input_file = '../data/blast/RPI369/rna_pair_list.txt'
+    output_file = '../data/blast/RPI369/rna_rna_pairs.xlsx'
     rna_rna_pairs = process_text_file(input_file)
     write_to_excel(rna_rna_pairs, output_file)

@@ -103,6 +103,12 @@ def read_kmer_dataset(rna_list, protein_list):
     rna_kmer_path = 'data/lncRNA_3_mer/'+ args.interactionDatasetName +'/lncRNA_3_mer.txt'
     protein_kmer_path = 'data/protein_2_mer/'+ args.interactionDatasetName +'/protein_2_mer.txt'
 
+    rna_fm_embeddings_path = f'data/RNA-FM/{args.interactionDatasetName}/lncRNA_embeddings.pt'
+    rna_fm_embeddings = torch.load(rna_fm_embeddings_path)
+
+    protein_esm_embeddings_path = f'data/esm/{args.interactionDatasetName}/protein_embeddings.pt'
+    protein_esm_embeddings = torch.load(protein_esm_embeddings_path)
+
     # 读取 RNA 的 k - mer 数据
     rna_kmer_dict = {}
     with open(rna_kmer_path, 'r') as rna_file:
@@ -120,6 +126,10 @@ def read_kmer_dataset(rna_list, protein_list):
     for rna in rna_list:
         if rna.name in rna_kmer_dict:
             rna.embedded_vector = rna_kmer_dict[rna.name]
+            embedding = rna_fm_embeddings[rna.name]
+            # 对 1024 维取均值得到 640 维嵌入向量
+            processed_embedding = torch.mean(embedding, dim=0).tolist()
+            rna.attributes_vector = processed_embedding
 
     # 读取蛋白质的 k - mer 数据
     protein_kmer_dict = {}
@@ -138,6 +148,10 @@ def read_kmer_dataset(rna_list, protein_list):
     for protein in protein_list:
         if protein.name in protein_kmer_dict:
             protein.embedded_vector = protein_kmer_dict[protein.name]
+            embedding = protein_esm_embeddings[protein.name]
+            # 对 1024 维取均值得到 640 维嵌入向量
+            processed_embedding = torch.mean(embedding, dim=0).tolist()
+            protein.attributes_vector = processed_embedding
 
     return rna_list, protein_list
 
@@ -197,8 +211,12 @@ def read_jaccard_dataset(lncRNA_list, protein_list):
     # 计算lncRNA两两之间的jaccard系数
     for i in range(len(lncRNA_list) - 1):
         set1 = lncRNA_Jaccard_dic[lncRNA_list[i]]
+        if(len(set1) == 0):
+            continue
         for j in range(i + 1, len(lncRNA_list)):
             set2 = lncRNA_Jaccard_dic[lncRNA_list[j]]
+            if(len(set2) == 0 ):
+                continue
             jaccard = len(set1.intersection(set2)) / len(set1.union(set2))
             if jaccard > 0.8:
                 jaccard_list.append(RNA2RNA(lncRNA_list[i], lncRNA_list[j], 1, jaccard_number))
@@ -208,8 +226,12 @@ def read_jaccard_dataset(lncRNA_list, protein_list):
     # 计算蛋白质两两之间的jaccard系数
     for i in range(len(protein_list) - 1):
         set1 = protein_Jaccard_dic[protein_list[i]]
+        if (len(set1) == 0):
+            continue
         for j in range(i + 1, len(protein_list)):
             set2 = protein_Jaccard_dic[protein_list[j]]
+            if (len(set2) == 0):
+                continue
             jaccard = len(set1.intersection(set2)) / len(set1.union(set2))
             if jaccard > 0:
                 jaccard_list.append(RNA2RNA(protein_list[i], protein_list[j], 0, jaccard_number))
@@ -221,11 +243,11 @@ def read_jaccard_dataset(lncRNA_list, protein_list):
     return jaccard_list
 
 
-def read_blast_dataset(lncRNA_name_index_dict, protein_name_index_dict):
+def read_blast_dataset(lncRNA_name_index_dict, protein_name_index_dict, dataset_name):
     global lncRNA_list, protein_list
     blast_list = []
-    rna_pairs_path = 'rna_rna_pairs.xlsx'
-    protein_pairs_path = 'protein_protein_pairs.xlsx'
+    rna_pairs_path = 'data/blast/'+dataset_name+'/rna_rna_pairs.xlsx'
+    protein_pairs_path = 'data/blast/'+dataset_name+'/protein_protein_pairs.xlsx'
 
     if not osp.exists(rna_pairs_path) or not osp.exists(protein_pairs_path):
         raise FileNotFoundError("One or both of the pair files do not exist.")
@@ -240,7 +262,7 @@ def read_blast_dataset(lncRNA_name_index_dict, protein_name_index_dict):
             rna1 = lncRNA_list[lncRNA_name_index_dict[rna1_name]]
             rna2 = lncRNA_list[lncRNA_name_index_dict[rna2_name]]
             blast_list.append(RNA2RNA(rna1, rna2,1,cnt))
-            rna_cnt = cnt + 1
+            cnt = cnt + 1
     number = len(blast_list)
     cnt = 0
     # 读取protein_protein_pairs.xlsx
@@ -271,12 +293,42 @@ def create_pyg_graph_jaccard(interaction_list, lncRNA_list, protein_list, jaccar
 
     # 将 RNA 的 embedded_vector 作为节点特征
     for rna in lncRNA_list:
-        lncRNA_features.append(rna.embedded_vector)
+        combined_feature = rna.embedded_vector + rna.attributes_vector
+        lncRNA_features.append(combined_feature)
+
+    empty_indices = []
+    for i, feat in enumerate(lncRNA_features):
+        if len(feat) == 0:
+            print(f"lncRNA索引 {i} 的特征为空，对应ID: {lncRNA_list[i].name}")
+            empty_indices.append(i)
+
+    if empty_indices:
+        print(f"发现 {len(empty_indices)} 个空特征，占比: {len(empty_indices) / len(lncRNA_features):.2%}")
+        # 可选：移除空特征对应的lncRNA
+        lncRNA_features = [feat for i, feat in enumerate(lncRNA_features) if i not in empty_indices]
+        filtered_lncRNA_list = [lncRNA for i, lncRNA in enumerate(lncRNA_list) if i not in empty_indices]
+
     lncRNA_features = torch.tensor(lncRNA_features, dtype=torch.float)
 
     # 将蛋白质的 embedded_vector 作为节点特征
     for protein in protein_list:
-        protein_features.append(protein.embedded_vector)
+        combined_feature = protein.embedded_vector + protein.attributes_vector
+        protein_features.append(combined_feature)
+
+    empty_indices = []
+    invalid_dim_indices = []
+
+    for i, feat in enumerate(protein_features):
+        if len(feat) == 0:
+            print(f"蛋白质索引 {i} 的特征为空，对应ID: {protein_list[i].name}")
+            empty_indices.append(i)
+        elif len(feat) != 1329:  # 假设蛋白质特征维度应为1329
+            print(f"蛋白质索引 {i} 的特征维度异常: 期望1329, 实际{len(feat)}，对应ID: {protein_list[i].name}")
+            invalid_dim_indices.append(i)
+
+    if empty_indices:
+        print(f"发现 {len(empty_indices)} 个空特征，占比: {len(empty_indices) / len(protein_features):.2%}")
+
     protein_features = torch.tensor(protein_features, dtype=torch.float)
 
     # 添加节点特征
@@ -318,12 +370,14 @@ def create_pyg_graph_blast(interaction_list, lncRNA_list, protein_list, blast_li
 
     # 将 RNA 的 embedded_vector 作为节点特征
     for rna in lncRNA_list:
-        lncRNA_features.append(rna.embedded_vector)
+        combined_feature = rna.embedded_vector + rna.attributes_vector
+        lncRNA_features.append(combined_feature)
     lncRNA_features = torch.tensor(lncRNA_features, dtype=torch.float)
 
     # 将蛋白质的 embedded_vector 作为节点特征
     for protein in protein_list:
-        protein_features.append(protein.embedded_vector)
+        combined_feature = protein.embedded_vector + protein.attributes_vector
+        protein_features.append(combined_feature)
     protein_features = torch.tensor(protein_features, dtype=torch.float)
 
     # 添加节点特征
@@ -413,6 +467,97 @@ def generate_training_and_testing(graph_jaccard, graph_blast):
         print(subgraph_blast)
         print('*******************************************')
 
+def generate_unknow_testing(graph_jaccard, graph_blast):
+    global interaction_list, negative_interaction_list, args
+    all_interactions = interaction_list + negative_interaction_list
+    random.shuffle(all_interactions)
+
+    # 分离正样本和负样本
+    positive_samples = [interaction for interaction in all_interactions if interaction.y == 1]
+    negative_samples = [interaction for interaction in all_interactions if interaction.y == 0]
+
+    # 确保正负样本数量相等
+    min_samples = min(len(positive_samples), len(negative_samples))
+    positive_samples = positive_samples[:min_samples]
+    negative_samples = negative_samples[:min_samples]
+
+    all_samples = positive_samples + negative_samples
+    random.shuffle(all_samples)
+
+    # 所有样本都作为测试集
+    test_samples = all_samples
+
+    # 生成子图
+    subgraph_jaccard = graph_jaccard.clone()
+    subgraph_blast = graph_blast.clone()
+
+    # 删除子图中测试集正样本的边
+    test_positive_samples = [sample for sample in test_samples if sample.y == 1]
+    for sample in test_positive_samples:
+        lncRNA_index = sample.lncRNA.serial_number
+        protein_index = sample.protein.serial_number
+
+        edge_index = subgraph_jaccard['lncRNA', 'interacts_with', 'protein'].edge_index
+        mask = ~((edge_index[0] == lncRNA_index) & (edge_index[1] == protein_index))
+        subgraph_jaccard['lncRNA', 'interacts_with', 'protein'].edge_index = edge_index[:, mask]
+
+        edge_index = subgraph_blast['lncRNA', 'interacts_with', 'protein'].edge_index
+        mask = ~((edge_index[0] == lncRNA_index) & (edge_index[1] == protein_index))
+        subgraph_blast['lncRNA', 'interacts_with', 'protein'].edge_index = edge_index[:, mask]
+
+    # 保存测试集和子图
+    fold_dir = 'data/graph/' + args.projectName
+    os.makedirs(fold_dir, exist_ok=True)
+
+    torch.save(test_samples, os.path.join(fold_dir, 'test_samples.pt'))
+    torch.save(subgraph_jaccard, os.path.join(fold_dir, 'subgraph_jaccard.pt'))
+    torch.save(subgraph_blast, os.path.join(fold_dir, 'subgraph_blast.pt'))
+
+    print("Unknown testing samples saved successfully.")
+    print(subgraph_jaccard)
+    print(subgraph_blast)
+    print('*******************************************')
+
+
+def count_clusters(graph):
+    # 获取图的所有节点类型
+    node_types = graph.node_types
+
+    # 创建邻接表
+    num_nodes = sum(graph[node_type].x.size(0) for node_type in node_types)
+    adj_list = [[] for _ in range(num_nodes)]
+
+    # 处理每种边类型
+    for edge_type in graph.edge_types:
+        src_type, relation, dst_type = edge_type
+        if relation in ['jaccard_related', 'blast_related']:  # 仅处理 Jaccard 或 BLAST 边
+            edge_index = graph[edge_type].edge_index
+            src_offset = sum(graph[node_type].x.size(0) for node_type in node_types[:node_types.index(src_type)])
+            dst_offset = sum(graph[node_type].x.size(0) for node_type in node_types[:node_types.index(dst_type)])
+
+            for i in range(edge_index.size(1)):
+                src_node = edge_index[0, i].item() + src_offset
+                dst_node = edge_index[1, i].item() + dst_offset
+                adj_list[src_node].append(dst_node)
+                adj_list[dst_node].append(src_node)
+
+    # 标记节点是否被访问过
+    visited = [False] * num_nodes
+
+    def dfs(node):
+        visited[node] = True
+        for neighbor in adj_list[node]:
+            if not visited[neighbor]:
+                dfs(neighbor)
+
+    # 计算簇的数量
+    cluster_count = 0
+    for node in range(num_nodes):
+        if not visited[node]:
+            dfs(node)
+            cluster_count += 1
+
+    return cluster_count
 
 if __name__ == '__main__':
     args = parse_args()
@@ -424,10 +569,17 @@ if __name__ == '__main__':
         negative_interaction_generation() # 生成负样本
     lncRNA_list, protein_list = read_kmer_dataset(lncRNA_list,protein_list)
     jaccard_list = read_jaccard_dataset(lncRNA_list=lncRNA_list, protein_list=protein_list)
-    blast_list = read_blast_dataset(lncRNA_name_index_dict=lncRNA_name_index_dict, protein_name_index_dict=protein_name_index_dict)
+    blast_list = read_blast_dataset(lncRNA_name_index_dict=lncRNA_name_index_dict, protein_name_index_dict=protein_name_index_dict,dataset_name=args.interactionDatasetName)
 
     graph_jaccard = create_pyg_graph_jaccard(interaction_list, lncRNA_list, protein_list, jaccard_list)
     graph_blast = create_pyg_graph_blast(interaction_list, lncRNA_list, protein_list, blast_list)
+
+    cluster_count_jaccard = count_clusters(graph_jaccard)
+    cluster_count_blast = count_clusters(graph_blast)
+
+    print(f"Jaccard图中的簇的数量: {cluster_count_jaccard}")
+    print(f"BLAST图中的簇的数量: {cluster_count_blast}")
     # generate_training_and_testing(graph_jaccard,graph_blast)
-    print(graph_jaccard)
-    print(graph_blast)
+    # generate_unknow_testing(graph_jaccard,graph_blast)
+    #print(graph_jaccard)
+    #print(graph_blast)
