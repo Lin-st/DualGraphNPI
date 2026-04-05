@@ -62,9 +62,16 @@ python -m src.protein_blast_dataset --db_name <database_name>
 ```
 
 ### 3. Build Heterogeneous Graphs and Generate 5‑Fold Cross‑Validation Data
-```bush
+Edit src/generate_edgelist.py and choose one of the following functions inside if __name__ == "__main__"::
+- For 5‑fold cross‑validation (recommended for training/evaluation on the same dataset):
+```bash
 python -m src.generate_edgelist --projectName <yourName> --interactionDatasetName <database_name> --createBalanceDataset 1
 ```
+- For a single independent test set (e.g., for final evaluation on unseen data):
+```bash
+generate_unknow_testing(graph_jaccard, graph_blast)
+```
+
 - projectName: output directory name (usually the database name)
 
 - interactionDatasetName: prefix of the interaction dataset file (usually the database name)
