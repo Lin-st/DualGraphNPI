@@ -45,7 +45,7 @@ if __name__ == "__main__":
     db_name = args.db_name
 
     input_file = f'data/blast/{db_name}/protein_pair_list.txt'
-    output_file = f'data/blast/{db_name}/protein_protein_pairs2xlsx'
+    output_file = f'data/blast/{db_name}/protein_protein_pairs.xlsx'
     # 确保输出目录存在
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     rna_rna_pairs = process_text_file(input_file)
