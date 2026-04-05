@@ -333,12 +333,12 @@ if __name__ == "__main__":
           f'Test Specificity: {test_specificity:.4f}, Test Precision: {test_precision:.4f}, '
           f'Test MCC: {test_mcc:.4f}')
 
-    # # 创建保存模型的文件夹
-    # save_dir = '../saved_models'
-    # if not os.path.exists(save_dir):
-    #     os.makedirs(save_dir)
-    #
-    # # 保存模型的状态字典
-    # model_path = os.path.join(save_dir, 'final_model_2241.pth')
-    # torch.save(model.state_dict(), model_path)
-    # print(f'Model saved to {model_path}')
+   # 创建保存模型的文件夹
+    save_dir = 'saved_models'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # 保存模型的状态字典
+    model_path = os.path.join(save_dir, 'final_model_' + args.projectName + '.pth')
+    torch.save(model.state_dict(), model_path)
+    print(f'Model saved to {model_path}')
