@@ -1,5 +1,12 @@
+import argparse
+import os
+
 import openpyxl
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--db_name", required=True, help="Database name, e.g., RPI369")
+    return parser.parse_args()
 
 def process_text_file(file_path):
     pairs = set()
@@ -34,7 +41,12 @@ def write_to_excel(pairs, output_file_path):
 
 
 if __name__ == "__main__":
-    input_file = '../data/blast/RPI369/rna_pair_list.txt'
-    output_file = '../data/blast/RPI369/rna_rna_pairs.xlsx'
+    args = parse_args()
+    db_name = args.db_name
+
+    input_file = f'data/blast/{db_name}/rna_pair_list.txt'
+    output_file = f'data/blast/{db_name}/rna_rna_pairs.xlsx'
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
     rna_rna_pairs = process_text_file(input_file)
     write_to_excel(rna_rna_pairs, output_file)

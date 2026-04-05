@@ -1,6 +1,11 @@
+import argparse
 import subprocess
 import os
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate RNA BLAST pairs")
+    parser.add_argument("--db_name", required=True, help="Database name, e.g., RPI369")
+    return parser.parse_args()
 
 def create_blast_database(fasta_file):
     """
@@ -81,10 +86,14 @@ def create_rna_pair_list(query_id, all_hit_ids, output_file):
 
 
 if __name__ == "__main__":
-    # fasta_file = "data/lncRNA_sequence/NPInter2/lncRNA_sequence.fasta"  # 替换为你的 RNA FASTA 文件路径
-    # output_file = "rna_pair_list.txt"
-    fasta_file = "../data/lncRNA_sequence/RPI369/lncRNA_sequence.fasta"  # 替换为你的 RNA FASTA 文件路径
-    output_file = "../data/blast/RPI369/rna_pair_list.txt"
+    args = parse_args()
+    db_name = args.db_name
+
+    fasta_file = f"data/lncRNA_sequence/{db_name}/lncRNA_sequence.fasta"
+    output_file = f"data/blast/{db_name}/rna_pair_list.txt"
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
     # 创建 BLAST 数据库
     create_blast_database(fasta_file)
     # 提取所有序列 ID

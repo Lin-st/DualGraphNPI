@@ -1,5 +1,11 @@
+import argparse
 import subprocess
 import os
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate Protein BLAST pairs")
+    parser.add_argument("--db_name", required=True, help="Database name, e.g., RPI369")
+    return parser.parse_args()
 
 def create_blast_database(fasta_file):
     """
@@ -102,8 +108,13 @@ def process_protein_id(raw_id):
 
 
 if __name__ == "__main__":
-    fasta_file = "../data/protein_sequence/RPI369/protein_sequence.fasta"
-    output_file = "../data/blast/RPI369/protein_pair_list.txt"
+    args = parse_args()
+    db_name = args.db_name
+
+    fasta_file = f"data/protein_sequence/{db_name}/protein_sequence.fasta"
+    output_file = f"data/blast/{db_name}/protein_pair_list.txt"
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     # 创建 BLAST 蛋白质数据库
     create_blast_database(fasta_file)
 

@@ -1,3 +1,5 @@
+import argparse
+
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import HeteroConv, GCNConv, SAGEConv, Linear
@@ -7,6 +9,12 @@ from sklearn.metrics import matthews_corrcoef, roc_auc_score, auc, precision_rec
 import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Evaluate trained model on test dataset")
+    parser.add_argument('--trained_model', required=True, help='Path to trained model .pth file')
+    parser.add_argument('--projectName', required=True, help='Database name for test data (e.g., NPInter5_test)')
+    return parser.parse_args()
 
 class SampleDataset(Dataset):
     def __init__(self, samples):
@@ -248,6 +256,7 @@ def calculate_top_n_precision(scores, labels, top_n):
 
 
 if __name__ == "__main__":
+    args = parse_args()
     in_channels = {
         'lncRNA': 64 + 640,
         'protein': 49 + 1280
@@ -258,11 +267,11 @@ if __name__ == "__main__":
     model = model.to(device)
 
     # 加载模型
-    model_path = '../saved_models/final_model.pth'
+    model_path = 'saved_models/final_model_' + args.trained_model +'.pth'
     model.load_state_dict(torch.load(model_path))
 
     # 加载测试集数据
-    test_dir = '../data/graph/NPInter5_test'
+    test_dir = 'data/graph/' + args.projectName
     test_samples = torch.load(os.path.join(test_dir, 'test_samples.pt'))
     graph_jaccard = torch.load(os.path.join(test_dir, 'subgraph_jaccard.pt'))
     graph_blast = torch.load(os.path.join(test_dir, 'subgraph_blast.pt'))

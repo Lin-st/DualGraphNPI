@@ -1,3 +1,4 @@
+import argparse
 import os
 # os.environ["http_proxy"] = "http://127.0.0.1:10809"  # 替换为您的V2Ray端口
 # os.environ["https_proxy"] = "http://127.0.0.1:10809"
@@ -6,6 +7,10 @@ from Bio import SeqIO
 from tqdm import tqdm  # 进度条库
 from multimolecule import RnaTokenizer, RnaFmModel
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate RNA embeddings using RNA-FM model")
+    parser.add_argument("--db_name", required=True, help="Database name (e.g., NPInter5)")
+    return parser.parse_args()
 
 def create_output_dir(path):
     """创建输出目录（如果不存在）"""
@@ -92,8 +97,11 @@ def generate_embeddings(model, tokenizer, sequences, sequence_ids, output_path, 
 
 def main():
     # 配置路径
-    input_fasta = "../data/lncRNA_sequence/NPInter5_test/lncRNA_sequence.fasta"
-    output_path = "../data/RNA-FM/NPInter5/lncRNA_embeddings.pt"
+    args = parse_args()
+    db_name = args.db_name
+
+    input_fasta = f"data/lncRNA_sequence/{db_name}/lncRNA_sequence.fasta"
+    output_path = f"data/RNA-FM/{db_name}/lncRNA_embeddings.pt"
 
     # 检查输入文件
     if not os.path.exists(input_fasta):

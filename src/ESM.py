@@ -1,3 +1,4 @@
+import argparse
 import os
 # os.environ["http_proxy"] = "http://127.0.0.1:10809"  # 替换为您的V2Ray端口
 # os.environ["https_proxy"] = "http://127.0.0.1:10809"
@@ -6,6 +7,10 @@ from Bio import SeqIO
 from tqdm import tqdm
 from transformers import AutoTokenizer, EsmModel
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate protein embeddings using ESM2 model")
+    parser.add_argument("--db_name", required=True, help="Database name (e.g., NPInter5)")
+    return parser.parse_args()
 
 def create_output_dir(path):
     """创建输出目录（如果不存在）"""
@@ -101,8 +106,11 @@ def generate_protein_embeddings(model, tokenizer, sequences, sequence_ids, outpu
 
 def main():
     # 配置路径
-    input_fasta = "../data/protein_sequence/NPInter5_test/protein_sequence.fasta"
-    output_dir = "../data/esm/NPInter5"
+    args = parse_args()
+    db_name = args.db_name
+
+    input_fasta = "data/protein_sequence/" + db_name + "/protein_sequence.fasta"
+    output_dir = "data/esm/" + db_name
 
     # 检查输入文件
     if not os.path.exists(input_fasta):
