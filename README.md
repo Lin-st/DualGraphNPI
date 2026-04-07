@@ -1,5 +1,3 @@
-<img width="585" height="1041" alt="image" src="https://github.com/user-attachments/assets/e59b9afd-4e60-4df7-9163-21486fef1176" /># DualGraphNPI: A Contrastive Dual-Graph Method for RNA-Protein Interaction Prediction
-
 This document provides instructions for running the DualGraphNPI pipeline using Python module execution (`python -m src.xxx`). All commands must be executed from the project root directory `DualGraphNPI`.
 
 ## Data Organization (Important)
