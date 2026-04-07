@@ -30,6 +30,10 @@ Input data must be placed in the following fixed directory structure. File names
 - `{db_name}` is the database name (e.g., `RPI369`, `NPInter5`). All scripts accept the `--db_name` argument and automatically construct paths.
 - **All input files must exist**; otherwise the scripts will raise `FileNotFoundError`.
 - **Output directories are created automatically**.
+- The required datasets (including lncRNA/protein sequences, interaction Excel files, and precomputed k‑mer features) can be downloaded from Zenodo:  
+[https://zenodo.org/uploads/19453220](https://zenodo.org/uploads/19453220)
+
+After downloading, please extract the files and place them into the  `DualGraphNPI/` according to the structure described above. All input files must exist before running the pipeline.
 
 ## 1. Generate Feature Embeddings
 
