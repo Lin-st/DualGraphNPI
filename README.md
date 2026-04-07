@@ -1,4 +1,4 @@
-# DualGraphNPI: A Contrastive Dual-Graph Method for RNA-Protein Interaction Prediction
+<img width="585" height="1041" alt="image" src="https://github.com/user-attachments/assets/e59b9afd-4e60-4df7-9163-21486fef1176" /># DualGraphNPI: A Contrastive Dual-Graph Method for RNA-Protein Interaction Prediction
 
 This document provides instructions for running the DualGraphNPI pipeline using Python module execution (`python -m src.xxx`). All commands must be executed from the project root directory `DualGraphNPI`.
 
@@ -31,7 +31,7 @@ Input data must be placed in the following fixed directory structure. File names
 - **All input files must exist**; otherwise the scripts will raise `FileNotFoundError`.
 - **Output directories are created automatically**.
 - The required datasets (including lncRNA/protein sequences, interaction Excel files, and precomputed k‑mer features) can be downloaded from Zenodo:  
-[https://zenodo.org/uploads/19453220](https://zenodo.org/uploads/19453220)
+[https://zenodo.org/records/19453220](https://zenodo.org/records/19453220)
 
 After downloading, please extract the files and place them into the  `DualGraphNPI/` according to the structure described above. All input files must exist before running the pipeline.
 
