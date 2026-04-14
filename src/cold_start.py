@@ -278,7 +278,7 @@ if __name__ == "__main__":
     model = model.to(device)
 
     # 加载模型
-    model_path = 'saved_models/final_model_' + args.trained_model +'.pth'
+    model_path = 'saved_cold_models/final_model_' + args.trained_model +'.pth'
     model.load_state_dict(torch.load(model_path))
 
     # 加载测试集数据
