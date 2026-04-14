@@ -81,9 +81,13 @@ generate_unknow_testing(graph_jaccard, graph_blast)
 - Output: data/graph/{projectName}/fold_0/ – fold_4/
 
 ### 4. Train the Model
-Example for fold 0:
+#### 1. Example for fold 0（normal train and save):
 ```bush
 python -m src.train_save_model --projectName <yourName> --fold 0
+```
+#### 2. Example for fold 0（train and save for cold_start prediction):
+```bush
+python -m src.cold_start_train --projectName <yourName> --fold 0
 ```
 
 ### 5. Evaluate a Saved Model (Prediction)
@@ -110,9 +114,12 @@ python -m src.protein_blast_dataset --db_name RPI369
 # 3. Build graphs (5‑fold cross‑validation)
 python -m src.generate_edgelist --projectName myTest --interactionDatasetName RPI369 --createBalanceDataset 1
 
-# 4. Train on fold 0 (model will be saved as final_model_RPI369.pth if you uncomment saving)
-python -m src.model2_final_test --projectName myTest --fold 0
+# 4. Train on fold 0 (model will be saved as save_models/final_model_RPI369.pth if you uncomment saving)
+python -m src.train_save_model --projectName myTest --fold 0
 
-# 5. Predict using the saved model on a separate test set
-python -m src.model_predict --trained_model myTest --projectName NPInter5_test
+# 5. Train on fold 0 (model will be saved as saved_cold_models/final_model_RPI369.pth if you uncomment saving)
+python -m src.cold_start_train --projectName myTest --fold 0
+
+# 6. Predict using the cold_train_saved model on a separate test set
+python -m src.cold_start --trained_model myTest --projectName NPInter5_test
 ```
