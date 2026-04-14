@@ -152,16 +152,27 @@ def evaluate_model(model, graph_jaccard, graph_blast, samples, batch_size=512, t
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, drop_last=False)
 
     # 预加载图数据到GPU
-    x_dict_jaccard = {
-        'lncRNA': graph_jaccard['lncRNA'].x.to(device),
-        'protein': graph_jaccard['protein'].x.to(device)
-    }
-    edge_index_dict_jaccard = {
-        ('lncRNA', 'jaccard_related', 'lncRNA'): graph_jaccard['lncRNA', 'jaccard_related', 'lncRNA'].edge_index.to(
-            device),
-        ('protein', 'jaccard_related', 'protein'): graph_jaccard['protein', 'jaccard_related', 'protein'].edge_index.to(
-            device)
-    }
+    if graph_jaccard is None:
+        # 构造一个空图，节点特征与 BLAST 图相同，但所有边均为空
+        x_dict_jaccard = {
+            'lncRNA': graph_blast['lncRNA'].x.to(device),
+            'protein': graph_blast['protein'].x.to(device)
+        }
+        edge_index_dict_jaccard = {
+            ('lncRNA', 'jaccard_related', 'lncRNA'): torch.empty(2, 0, dtype=torch.long, device=device),
+            ('protein', 'jaccard_related', 'protein'): torch.empty(2, 0, dtype=torch.long, device=device)
+        }
+    else:
+        x_dict_jaccard = {
+            'lncRNA': graph_jaccard['lncRNA'].x.to(device),
+            'protein': graph_jaccard['protein'].x.to(device)
+        }
+        edge_index_dict_jaccard = {
+            ('lncRNA', 'jaccard_related', 'lncRNA'): graph_jaccard['lncRNA', 'jaccard_related', 'lncRNA'].edge_index.to(
+                device),
+            ('protein', 'jaccard_related', 'protein'): graph_jaccard['protein', 'jaccard_related', 'protein'].edge_index.to(
+                device)
+        }
     x_dict_blast = {
         'lncRNA': graph_blast['lncRNA'].x.to(device),
         'protein': graph_blast['protein'].x.to(device)
@@ -275,10 +286,10 @@ if __name__ == "__main__":
     test_samples = torch.load(os.path.join(test_dir, 'test_samples.pt'))
     graph_jaccard = torch.load(os.path.join(test_dir, 'subgraph_jaccard.pt'))
     graph_blast = torch.load(os.path.join(test_dir, 'subgraph_blast.pt'))
-    N = 2200
+    N = 200
     # 评估模型，增加Top-n精度计算
     test_accuracy, test_sensitivity, test_specificity, test_precision, test_mcc, test_top5, test_auroc, test_auprc, top_fifty_combinations = evaluate_model(
-        model, graph_jaccard, graph_blast, test_samples, top_n=N)
+        model, None, graph_blast, test_samples, top_n=N)
     print(f'Test Accuracy: {test_accuracy:.4f}, Test Sensitivity: {test_sensitivity:.4f}, '
           f'Test Specificity: {test_specificity:.4f}, Test Precision: {test_precision:.4f}, '
           f'Test MCC: {test_mcc:.4f},\nTest Top-{N} Precision: {test_top5:.4f}, '
