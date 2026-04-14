@@ -87,7 +87,7 @@ python -m src.train_save_model --projectName <yourName> --fold 0
 ```
 #### 2. Example for fold 0（train and save for cold_start prediction):
 ```bush
-python -m src.cold_start_train --projectName <yourName> --fold 0
+python -m src.cold_train_save --projectName <yourName> --fold 0
 ```
 
 ### 5. Evaluate a Saved Model (Prediction)
@@ -117,8 +117,8 @@ python -m src.generate_edgelist --projectName myTest --interactionDatasetName RP
 # 4. Train on fold 0 (model will be saved as save_models/final_model_RPI369.pth if you uncomment saving)
 python -m src.train_save_model --projectName myTest --fold 0
 
-# 5. Train on fold 0 (model will be saved as saved_cold_models/final_model_RPI369.pth if you uncomment saving)
-python -m src.cold_start_train --projectName myTest --fold 0
+# 5. Train on fold 0 (cold_start_model will be saved as saved_cold_models/final_model_RPI369.pth if you uncomment saving)
+python -m src.cold_train_save --projectName myTest --fold 0
 
 # 6. Predict using the cold_train_saved model on a separate test set
 python -m src.cold_start --trained_model myTest --projectName NPInter5_test
