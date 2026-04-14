@@ -579,7 +579,7 @@ if __name__ == '__main__':
 
     print(f"Jaccard图中的簇的数量: {cluster_count_jaccard}")
     print(f"BLAST图中的簇的数量: {cluster_count_blast}")
-    # generate_training_and_testing(graph_jaccard,graph_blast)
+    generate_training_and_testing(graph_jaccard,graph_blast)
     # generate_unknow_testing(graph_jaccard,graph_blast)
     #print(graph_jaccard)
     #print(graph_blast)
